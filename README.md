@@ -1,8 +1,10 @@
-# μblog
+# μblog-py
 
 ## Overview
-The goal of μblog (pronounced /myuːblɒɡ/) is to provide a single script that allows you to generate and manage a tiny static site blog.
-The μblog tool is written in shell script. It generates posts written in markdown in a beautiful, but minimalistic blog site.
+This is a Python port of [μblog](https://github.com/766F6964/mublog).
+
+The goal of μblog-py is to provide a single script that allows you to generate and manage a tiny static site blog.
+The μblog-py tool is written in Python, and has been ported from the shell script in the parent μblog project. It generates posts written in markdown in a beautiful, but minimalistic blog site.
 Create your blog now, without having to leverage large frameworks and software stacks.
 
 **Showcase:** 
@@ -64,8 +66,7 @@ And obviously, you can edit the CSS file to adjust colors, look and feel of the 
 ## Building:
 
 This blog includes some example posts, so you can get an idea about the look and feel.
-To build the page simply run `./mublog.sh` in the root directory. When the script is finished, the generated files
-can be found in the `dst` directory. To view the blog, you can spin up a webserver in that directory, e.g. `python3 -m http.server 8000`.
+To build the page simply run `./mublog.py` in the root directory. When the script is finished, the generated files can be found in the `dst` directory. To view the blog, you can spin up a webserver in that directory, e.g. `python3 -m http.server 8000`.
 Then visit `http://0.0.0.0:9000/` in your browser.
 
 ## Structure Explanation:
@@ -82,7 +83,7 @@ This metadata is validated during the build process, and used to ensure all post
 the correct title, and ordered by date in the article tab.
 The tag and description field is currently unused.
 
-If a post is a draft, and you dont want to include it in your build, prefix the markdown filename with an underscore.
+If a post is a draft, and you don't want to include it in your build, prefix the markdown filename with an underscore.
 
 ## Dependencies:
 
