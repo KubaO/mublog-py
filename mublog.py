@@ -23,9 +23,19 @@ footer_copyright = f"&copy; 2023 {author_name}"
 
 def dedent(text: str) -> str:
     """Dedents the indentation common to all lines in the text"""
-    common_indent = re.match(r"^(\s*)[^s]", text)[1]
-    unindent = f"^{common_indent}"
-    return re.sub(unindent, "", text, flags=re.MULTILINE)
+    match = re.match(r"^(\s*)[^s]", text)
+    if match:
+        common_indent = match[1]
+        unindent = f"^{common_indent}"
+        return re.sub(unindent, "", text, flags=re.MULTILINE)
+    else:
+        return text
+
+
+def readfile(path: str) -> str:
+    """Reads a utf-8 encoded file"""
+    with open(path, encoding="utf-8") as f:
+        return f.read()
 
 
 def initialize_directories():
@@ -49,48 +59,7 @@ def initialize_directories():
     print("Build directories initialized.")
 
 
-def parse_header(src_post) -> dict[str, str]:
-    """Parses the header and returns a dictionary of fields from it.
-    """
-
-    print(f"Parsing post {src_post} ...")
-
-    with open(src_post, encoding="utf-8") as f:
-        lines = f.readlines()
-
-    patterns = (
-        # Line 1: Check for --- start-marker
-        (r"^---\s*$",
-         "Starting markers missing or incorrect"),
-        # Line 2: Check for title-field
-        (r"^title:\s*(?P<title>.*)\s*$",
-         "Title field missing or incorrect"),
-        # Line 3: Check for description-field
-        (r"^description:\s*(?P<description>.*)\s*$",
-         "Description field missing or incorrect"),
-        # Line 4: Check for date-field with valid date in YYYY-MM-DD format
-        (r"^date:\s*(?P<date>[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]))\s*$",
-         "Date field missing, incorrect or in wrong format."),
-        # Line 5: Check for tags-field
-        (r"^tags:\s*(?P<tags>.*)\s*$",
-         "Tags field missing or incorrect"),
-        # Line 6: Check for --- end-marker
-        (r"^---\s*$",
-         "Ending marker missing or incorrect")
-    )
-    results: dict[str, str] = {}
-    for line, pat_msg in zip(lines, patterns):
-        pattern, msg = pat_msg
-        match = re.match(pattern, line)
-        if match:
-            results |= match.groupdict()
-        else:
-            print(f"{src_post}: Invalid header \"{line}\".\n{msg}")
-            return {}
-    return results
-
-
-def build_page(src_md: str, dst_html: str, root: str):
+def convert_md_file(src_md: str, dst_html: str, root: str) -> dict[str, str]:
     """Converts the markdown post or page into html format.
 
     During this process, the header is prepended and the footer appended to the post.
@@ -98,13 +67,16 @@ def build_page(src_md: str, dst_html: str, root: str):
 
       src_md: The source path to the markdown post/page file
       dst_html: The destination file where the converted html file will be saved.
+
+    Returns:
+      metadata from the markdown file
     """
 
     md = markdown2.Markdown(extras=["metadata"])
-    with open(src_md, encoding='utf-8') as f:
-        html = md.convert(f.read())
+    html = md.convert(readfile(src_md))
+    metadata = md.metadata
 
-    title = f"<title>{md.metadata['title']}</title>\n" if "title" in md.metadata else ""
+    title = f"<title>{metadata['title']}</title>\n" if "title" in md.metadata else ""
 
     with open(dst_html, "w", encoding='utf-8') as f:
         f.write(dedent(f"""\
@@ -138,61 +110,70 @@ def build_page(src_md: str, dst_html: str, root: str):
             </body>
             </html>"""))
 
+    metadata["src"] = src_md
+    metadata["dst"] = dst_html
+    return metadata
 
-def process_files(src_posts_dir) -> list[dict[str, str]]:
+
+def convert_md_files(path: str, root: str) -> list[dict[str, str]]:
     """
-    Iterate through all source post files, and extract values stored in their headers
-    such as date, title, but also stores source path and destination path.
-    Return the list of dictionaries containing the data of the posts.
+    Iterate through all .md files in a directory, write out the html converted result,
+    and return a list of their metadata dictionaries.
     """
 
-    # Find all .md posts in the post directory and extract info from the headers
-    posts = []
-    for src_post_path in glob(f"{src_posts_dir}/*.md"):
-        post = parse_header(src_post_path)
-        if post:
-            post["basename"] = os.path.basename(src_post_path)
-            root_name, _ext = os.path.splitext(post["basename"])
+    # Find all .md files in the directory, convert them, and collect metadata
+    metadata_list = []
+    for src_post_path in glob(f"{path}/*.md"):
+        basename = os.path.basename(src_post_path)
+        if not basename.startswith(post_ignore_delim):
+            root_name, _ext = os.path.splitext(basename)
             dst_post_path = f"{dst_posts_dir}/{root_name}.html"
-            post["src"] = src_post_path
-            post["dst"] = dst_post_path
-            posts.append(post)
-    return posts
+
+            print(f'Processing post: {src_post_path}')
+            metadata = convert_md_file(src_post_path, dst_post_path, root)
+            metadata["basename"] = basename
+
+            print(f'    title:  {metadata["title"]}')
+            print(f'    date:   {metadata["date"]}')
+            print(f'    output: {metadata["dst"]}')
+            metadata_list.append(metadata)
+        else:
+            metadata_list.append({"skipped": src_post_path})
+
+    return metadata_list
 
 
-def sort_posts(posts: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Sorts posts in place in reverse chronological order, based on the extracted date"""
-    def key(post): return post["date"]
-    posts.sort(key=key)
-    return posts
+def sort_metadata(metadata: list[dict[str, str]]):
+    """Sorts posts in place in reverse chronological order, based on date"""
+    def key(metadata): return metadata["date"]
+    metadata.sort(key=key)
 
 
 if __name__ == "__main__":
     initialize_directories()
-    build_page(f"{src_root_dir}/about.md", f"{dst_root_dir}/about.html", ".")
-    build_page(f"{src_root_dir}/index.md", f"{dst_root_dir}/index.html", ".")
-    build_page(f"{src_root_dir}/articles.md",
-               f"{dst_root_dir}/articles.html", ".")
-    posts = process_files(src_posts_dir)
-    posts = sort_posts(posts)
+    convert_md_file(f"{src_root_dir}/about.md",
+                    f"{dst_root_dir}/about.html", ".")
+    convert_md_file(f"{src_root_dir}/index.md",
+                    f"{dst_root_dir}/index.html", ".")
+    convert_md_file(f"{src_root_dir}/articles.md",
+                    f"{dst_root_dir}/articles.html", ".")
+
+    metadata_list = convert_md_files(src_posts_dir, "..")
+    sort_metadata(metadata_list)
 
     posts_processed = 0
     posts_skipped = 0
 
     article_list = '<ul class="articles">\n'
 
-    for post in posts:
-        dst_link = post["dst"][len("dst/"):]
-        print(f'Processing post: {post["src"]}')
-        print(f'    title:  {post["title"]}')
-        print(f'    date:   {post["date"]}')
-        print(f'    output: {post["dst"]}')
-
-        if post["basename"].startswith(post_ignore_delim):
+    for metadata in metadata_list:
+        if "skipped" in metadata:
             posts_skipped += 1
         else:
-            article_list += f'<li><b style="color: #14263b;">{post["date"]}</b> <a href="{dst_link}">{post["title"]}</a></li>\n'
-            build_page(post["src"], post["dst"], "..")
+            date = metadata["date"]
+            title = metadata["title"]
+            dst_link = metadata["dst"][len("dst/"):]
+            article_list += f'<li><b style="color: #14263b;">{date}</b> <a href="{dst_link}">{title}</a></li>\n'
             posts_processed += 1
 
     article_list += '</ul>'
@@ -200,13 +181,11 @@ if __name__ == "__main__":
     print("Generating article listing ...")
 
     # Replace article tags in the article.html file with the generated article list
-    with open(f"{dst_root_dir}/articles.html", encoding="utf-8") as f:
-        articles_html = f.read()
-
+    articles_html = readfile(f"{dst_root_dir}/articles.html")
     articles_html = articles_html.replace(
         "<article>", f"<article>\n{article_list}")
 
-    with open(f"{dst_root_dir}/articles.html", "w", encoding="utf-8") as f:
-        f.write(articles_html)
+    with open(f"{dst_root_dir}/articles.html", "w", encoding="utf-8") as fo:
+        fo.write(articles_html)
 
     print(f"Finished! (built: {posts_processed}, skipped: {posts_skipped})")
