@@ -1,11 +1,10 @@
 #! /usr/bin/env python
 
 from glob import glob
-from inspect import cleandoc
+import markdown2
 import os
 import re
 import shutil
-import subprocess
 
 dst_root_dir = "dst"
 dst_posts_dir = f"{dst_root_dir}/posts"
@@ -21,7 +20,12 @@ author_name = "John Doe"
 author_mail = "johndoe@example.com"
 footer_copyright = f"&copy; 2023 {author_name}"
 
-pandoc_path = f"{os.environ['PROGRAMFILES']}\\pandoc" if os.name == "nt" else ""
+
+def dedent(text: str) -> str:
+    """Dedents the indentation common to all lines in the text"""
+    common_indent = re.match(r"^(\s*)[^s]", text)[1]
+    unindent = f"^{common_indent}"
+    return re.sub(unindent, "", text, flags=re.MULTILINE)
 
 
 def initialize_directories():
@@ -87,7 +91,7 @@ def parse_header(src_post) -> dict[str, str]:
 
 
 def build_page(src_md: str, dst_html: str, root: str):
-    """Converts the markdown post or page into html format using pandoc.
+    """Converts the markdown post or page into html format.
 
     During this process, the header is prepended and the footer appended to the post.
     Arguments:
@@ -96,10 +100,12 @@ def build_page(src_md: str, dst_html: str, root: str):
       dst_html: The destination file where the converted html file will be saved.
     """
 
-    result = subprocess.run([f"{pandoc_path}/pandoc", src_md, "-f",
-                            "markdown", "-t", "html"], capture_output=True, encoding='utf-8')
+    md = markdown2.Markdown(extras=["metadata"])
+    with open(src_md, encoding='utf-8') as f:
+        html = md.convert(f.read())
+
     with open(dst_html, "w", encoding='utf-8') as f:
-        f.write(cleandoc(f"""
+        f.write(dedent(f"""\
             <html>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -112,8 +118,8 @@ def build_page(src_md: str, dst_html: str, root: str):
             <a href="{root}/about.html">about</a>
             </nav>
             <hr>"""))
-        f.write(result.stdout)
-        f.write(cleandoc(f"""
+        f.write(html)
+        f.write(dedent(f"""\
             </main>
             <footer>
             <hr>

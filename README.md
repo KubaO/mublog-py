@@ -87,4 +87,4 @@ If a post is a draft, and you don't want to include it in your build, prefix the
 
 ## Dependencies:
 
-- pandoc
+- python and nothing else
