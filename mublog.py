@@ -39,15 +39,16 @@ def substitute(mapping: dict[str, str], in_path: str, out_path: str = None):
 
 def initialize_directories():
     """Removes old build artefacts, and generates the build directories"""
-    shutil.rmtree(path("dst_root"), ignore_errors=True)
+    if os.path.exists(path("dst_root")):
+        shutil.rmtree(path("dst_root"))
 
-    # Create output directories
-    for d in (path("dst_root"), path("dst_posts"), path("dst_css"), path("dst_assets")):
+    for d in (path("dst_root"), path("dst_posts"), path("dst_css")):
         os.makedirs(d, exist_ok=True)
 
-    for f in glob(path("src_css", "*.css")):
-        shutil.copy(f, path("dst_css"))
-    shutil.copytree(path("src_assets"), path("dst_assets"), dirs_exist_ok=True)
+    for css in glob(path("src_css", "*.css")):
+        shutil.copy(css, path("dst_css"))
+
+    shutil.copytree(path("src_assets"), path("dst_assets"))
 
     print("Build directories initialized.")
 
