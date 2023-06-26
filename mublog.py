@@ -104,19 +104,26 @@ def build_page(src_md: str, dst_html: str, root: str):
     with open(src_md, encoding='utf-8') as f:
         html = md.convert(f.read())
 
+    title = f"<title>{md.metadata['title']}</title>\n" if "title" in md.metadata else ""
+
     with open(dst_html, "w", encoding='utf-8') as f:
         f.write(dedent(f"""\
+            <!DOCTYPE html>
             <html>
+            <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <link rel="stylesheet" href="{root}/css/normalize.css" type="text/css" media="all">
             <link rel="stylesheet" href="{root}/css/style.css" type="text/css" media="all">
+            {title}</head>
+            <body>
             <nav>
             <a href="{root}/index.html">home</a>
             <a href="{root}/articles.html">articles</a>
             <a href="mailto:{author_mail}">mail</a>
             <a href="{root}/about.html">about</a>
             </nav>
+            <main>
             <hr>"""))
         f.write(html)
         f.write(dedent(f"""\
@@ -125,7 +132,7 @@ def build_page(src_md: str, dst_html: str, root: str):
             <hr>
             <p>
             {footer_copyright}
-            <br/>
+            <br>
             </p>
             </footer>
             </body>
