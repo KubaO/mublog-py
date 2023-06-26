@@ -1,2 +1,2 @@
 <article>
-</article>
+${articles}</article>

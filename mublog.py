@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 from glob import glob
+from string import Template
 import markdown2
 import os
 import re
@@ -21,21 +22,24 @@ author_mail = "johndoe@example.com"
 footer_copyright = f"&copy; 2023 {author_name}"
 
 
-def dedent(text: str) -> str:
-    """Dedents the indentation common to all lines in the text"""
-    match = re.match(r"^(\s*)[^s]", text)
-    if match:
-        common_indent = match[1]
-        unindent = f"^{common_indent}"
-        return re.sub(unindent, "", text, flags=re.MULTILINE)
-    else:
-        return text
-
-
 def readfile(path: str) -> str:
-    """Reads a utf-8 encoded file"""
     with open(path, encoding="utf-8") as f:
         return f.read()
+
+
+def writefile(path: str, contents: str):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(contents)
+
+
+def substitute(mapping: dict[str, str], in_path: str, out_path: str = None):
+    if not out_path:
+        out_path = in_path
+
+    template_text = readfile(in_path)
+    template = Template(template_text)
+    output = template.substitute(mapping)
+    writefile(out_path, output)
 
 
 def initialize_directories():
@@ -75,43 +79,20 @@ def convert_md_file(src_md: str, dst_html: str, root: str) -> dict[str, str]:
     md = markdown2.Markdown(extras=["metadata"])
     html = md.convert(readfile(src_md))
     metadata = md.metadata
+    metadata["src"] = src_md
+    metadata["dst"] = dst_html
 
     title = f"<title>{metadata['title']}</title>\n" if "title" in md.metadata else ""
 
-    with open(dst_html, "w", encoding='utf-8') as f:
-        f.write(dedent(f"""\
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <link rel="stylesheet" href="{root}/css/normalize.css" type="text/css" media="all">
-            <link rel="stylesheet" href="{root}/css/style.css" type="text/css" media="all">
-            {title}</head>
-            <body>
-            <nav>
-            <a href="{root}/index.html">home</a>
-            <a href="{root}/articles.html">articles</a>
-            <a href="mailto:{author_mail}">mail</a>
-            <a href="{root}/about.html">about</a>
-            </nav>
-            <main>
-            <hr>"""))
-        f.write(html)
-        f.write(dedent(f"""\
-            </main>
-            <footer>
-            <hr>
-            <p>
-            {footer_copyright}
-            <br>
-            </p>
-            </footer>
-            </body>
-            </html>"""))
+    substitutions = {
+        "author_mail": author_mail,
+        "contents": html,
+        "footer_copyright": footer_copyright,
+        "root": root,
+        "title": title,
+    }
+    substitute(substitutions, f"{src_root_dir}/post.html", dst_html)
 
-    metadata["src"] = src_md
-    metadata["dst"] = dst_html
     return metadata
 
 
@@ -180,12 +161,6 @@ if __name__ == "__main__":
 
     print("Generating article listing ...")
 
-    # Replace article tags in the article.html file with the generated article list
-    articles_html = readfile(f"{dst_root_dir}/articles.html")
-    articles_html = articles_html.replace(
-        "<article>", f"<article>\n{article_list}")
-
-    with open(f"{dst_root_dir}/articles.html", "w", encoding="utf-8") as fo:
-        fo.write(articles_html)
+    substitute({"articles": article_list}, f"{dst_root_dir}/articles.html")
 
     print(f"Finished! (built: {posts_processed}, skipped: {posts_skipped})")

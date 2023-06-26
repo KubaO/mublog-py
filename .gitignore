@@ -11,6 +11,7 @@
 !/*.py
 !/*.conf
 !/src/*.md
+!/src/post.html
 !/src/posts/*.md
 !/src/css/*.css
 !/src/assets/*.*
